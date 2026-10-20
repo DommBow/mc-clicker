@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minecraft Clicker</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+          --bg: #000000;
+          --surface: #141416;
+          --surface-hover: #1c1c1f;
+          --border: #2a2a2e;
+          --text-main: #ffffff;
+          --text-muted: #8e8e93;
+          --accent: #2b8cff;
+          --accent-hover: #1a7aeb;
+          --success: #32d74b;
+          --danger: #ff453a;
+        }
+
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+          background-color: var(--bg);
+          color: var(--text-main);
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden; /* Убираем скролл всей страницы */
+        }
+
+        /* Верхняя панель (Хедер) */
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+        }
+
+        .user-info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--text-muted);
+        }
+
+        .balance {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-weight: 600;
+          font-size: 15px;
+        }
+
+        .balance-icon {
+          width: 20px;
+          height: 20px;
+          background: linear-gradient(135deg, #ffd700, #ff8c00);
+          border-radius: 4px;
+        }
+
+        /* Заголовок игры */
+        .title-area {
+          padding: 0 20px 10px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .title {
+          font-size: 28px;
+          font-weight: 700;
+          letter-spacing: -0.5px;
+        }
+
+        /* Центральная зона с блоком */
+        .game-area {
+          flex: 1;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          position: relative;
+        }
+
+        .block-wrapper {
+          position: relative;
+          cursor: pointer;
+          transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+          filter: drop-shadow(0 20px 40px rgba(0,0,0,0.8));
+        }
+
+        .block-wrapper:active {
+          transform: scale(0.95);
+        }
+
+        #main-block {
+          width: 160px;
+          height: 160px;
+          image-rendering: pixelated;
+          border-radius: 12px;
+          border: 2px solid var(--border);
+        }
+
+        /* Всплывающий текст */
+        .floating-text {
+          position: absolute;
+          color: var(--text-main);
+          font-weight: 700;
+          font-size: 24px;
+          pointer-events: none;
+          animation: floatUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+          text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+          z-index: 10;
+        }
+
+        @keyframes floatUp {
+          0% { transform: translateY(0) scale(1); opacity: 1; }
+          100% { transform: translateY(-100px) scale(1.2); opacity: 0; }
+        }
+
+        /* Нижняя панель с контентом */
+        .bottom-sheet {
+          background: var(--surface);
+          border-top-left-radius: 24px;
+          border-top-right-radius: 24px;
+          padding: 20px;
+          padding-bottom: max(20px, env(safe-area-inset-bottom));
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          height: 45vh;
+          border-top: 1px solid var(--border);
+        }
+
+        /* Табы (Прокачка / Скины) */
+        .tabs {
+          display: flex;
+          background: var(--bg);
+          padding: 4px;
+          border-radius: 12px;
+          border: 1px solid var(--border);
+        }
+
+        .tab-btn {
+          flex: 1;
+          padding: 10px;
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          font-size: 14px;
+          font-weight: 600;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: 0.2s;
+        }
+
+        .tab-btn.active {
+          background: var(--surface-hover);
+          color: var(--text-main);
+        }
+
+        /* Контейнер для списков */
+        .content-container {
+          flex: 1;
+          overflow-y: auto;
+          display: none;
+          flex-direction: column;
+          gap: 10px;
+          padding-right: 4px;
+        }
+
+        .content-container.active {
+          display: flex;
+        }
+
+        /* Кастомный скроллбар */
+        .content-container::-webkit-scrollbar { width: 4px; }
+        .content-container::-webkit-scrollbar-track { background: transparent; }
+        .content-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* Элементы списка (Карточки) */
+        .card {
+          background: var(--bg);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          transition: 0.2s;
+        }
+
+        .card:active {
+          background: var(--surface-hover);
+        }
+
+        .card-icon {
+          width: 48px;
+          height: 48px;
+          image-rendering: pixelated;
+          border-radius: 10px;
+          background: var(--surface);
+          flex-shrink: 0;
+        }
+
+        .card-info {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .card-title {
+          font-size: 15px;
+          font-weight: 600;
+        }
+
+        .card-desc {
+          font-size: 13px;
+          color: var(--text-muted);
+        }
+
+        .buy-btn {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          color: var(--text-main);
+          padding: 10px 16px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: 0.2s;
+          min-width: 90px;
+          text-align: center;
+        }
+
+        .buy-btn.available {
+          background: var(--accent);
+          border-color: var(--accent);
+          color: #fff;
+        }
+
+        .buy-btn.available:active {
+          background: var(--accent-hover);
+        }
+
+        .buy-btn.owned {
+          background: transparent;
+          border-color: var(--success);
+          color: var(--success);
+        }
+
+        /* Кнопка сброса */
+        .reset-btn {
+          background: transparent;
+          color: var(--text-muted);
+          border: none;
+          font-size: 12px;
+          text-decoration: underline;
+          cursor: pointer;
+          margin-top: auto;
+          padding: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+<!-- Хедер -->
+<div class="header">
+    <div class="user-info">
+        <div class="avatar">LVL<br><span id="level-val">1</span></div>
+    </div>
+    <div class="balance">
+        <div class="balance-icon"></div>
+        <span id="score-val">0</span>
+    </div>
+</div>
+
+<div class="title-area">
+    <div class="title">Кликер</div>
+</div>
+
+<!-- Игровая зона -->
+<div class="game-area" id="click-zone">
+    <div class="block-wrapper" id="block-wrapper">
+        <img id="main-block" src="" alt="Block">
+    </div>
+</div>
+
+<!-- Нижняя панель -->
+<div class="bottom-sheet">
+    <div class="tabs">
+        <button class="tab-btn active" data-target="upgrades">Прокачка</button>
+        <button class="tab-btn" data-target="skins">Скины</button>
+    </div>
+
+    <div class="content-container active" id="upgrades">
+        <!-- Генерируется JS -->
+    </div>
+
+    <div class="content-container" id="skins">
+        <!-- Генерируется JS -->
+    </div>
+
+    <button class="reset-btn" onclick="resetGame()">Сбросить прогресс</button>
+</div>
+
+<script>
+    // ==========================================
+    // 1. ГЕНЕРАЦИЯ КАЧЕСТВЕННЫХ ТЕКСТУР
+    // ==========================================
+    // Мы используем шум Перлина и рандом для создания пиксельных текстур
+    function generateTexture(type) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(64, 64);
+
+      const colors = {
+        dirt:   [[134, 96, 67], [110, 78, 54], [96, 68, 47]],
+        stone:  [[128, 128, 128], [110, 110, 110], [145, 145, 145]],
+        wood:   [[102, 76, 46], [86, 63, 37], [115, 85, 52]],
+        iron:   [[216, 216, 216], [190, 190, 190], [230, 230, 230]],
+        gold:   [[252, 238, 75], [220, 200, 50], [255, 250, 120]],
+        diamond:[[92, 219, 213], [70, 180, 175], [130, 240, 235]],
+        obsidian:[[30, 20, 40], [20, 10, 30], [45, 30, 60]],
+        netherite:[[60, 50, 50], [40, 30, 30], [75, 60, 60]]
+      };
+
+      const palette = colors[type] || colors.stone;
+
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        // Простой псевдо-шум для пиксель-арта
+        const rand = Math.random();
+        let color = palette[0];
+
+        if (rand > 0.8) color = palette[1];
+        else if (rand > 0.6) color = palette[2];
+
+        // Добавляем легкий градиент сверху вниз для объема
+        const pixelIndex = i / 4;
+        const y = Math.floor(pixelIndex / 64);
+        const shadow = y > 32 ? -15 : (y < 16 ? 15 : 0);
+
+        imgData.data[i] = Math.max(0, Math.min(255, color[0] + shadow));
+        imgData.data[i+1] = Math.max(0, Math.min(255, color[1] + shadow));
+        imgData.data[i+2] = Math.max(0, Math.min(255, color[2] + shadow));
+        imgData.data[i+3] = 255;
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+
+      // Добавляем темную рамку по краям (как в кубиках майнкрафта)
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, 64, 64);
+
+      return canvas.toDataURL();
+    }
+
+    // ==========================================
+    // 2. ИГРОВЫЕ ДАННЫЕ
+    // ==========================================
+    const SKINS = [
+      { id: 'stone', name: 'Камень', price: 0, type: 'stone' },
+      { id: 'dirt', name: 'Земля', price: 1000, type: 'dirt' },
+      { id: 'wood', name: 'Дерево', price: 5000, type: 'wood' },
+      { id: 'iron', name: 'Железо', price: 25000, type: 'iron' },
+      { id: 'gold', name: 'Золото', price: 100000, type: 'gold' },
+      { id: 'diamond', name: 'Алмаз', price: 500000, type: 'diamond' },
+      { id: 'netherite', name: 'Незерит', price: 2000000, type: 'netherite' },
+      { id: 'obsidian', name: 'Обсидиан', price: 10000000, type: 'obsidian' },
+    ];
+
+    const UPGRADES = [
+      { id: 'p1', name: 'Каменная кирка', desc: '+1 к клику', baseCost: 50, effect: 1, type: 'click' },
+      { id: 'p2', name: 'Железная кирка', desc: '+5 к клику', baseCost: 500, effect: 5, type: 'click' },
+      { id: 'p3', name: 'Алмазная кирка', desc: '+25 к клику', baseCost: 5000, effect: 25, type: 'click' },
+      { id: 'p4', name: 'Незеритовая кирка', desc: '+150 к клику', baseCost: 50000, effect: 150, type: 'click' },
+      { id: 'a1', name: 'Робот-кликер', desc: '+2 в секунду', baseCost: 200, effect: 2, type: 'auto' },
+      { id: 'a2', name: 'Завод', desc: '+10 в секунду', baseCost: 2000, effect: 10, type: 'auto' },
+      { id: 'a3', name: 'Фабрика', desc: '+50 в секунду', baseCost: 20000, effect: 50, type: 'auto' },
+      { id: 'a4', name: 'Квантовый майнер', desc: '+300 в секунду', baseCost: 150000, effect: 300, type: 'auto' },
+    ];
+
+    // Кэш сгенерированных текстур, чтобы не грузить процессор
+    const textureCache = {};
+    SKINS.forEach(s => { textureCache[s.id] = generateTexture(s.type); });
+
+    // ==========================================
+    // 3. СОСТОЯНИЕ
+    // ==========================================
+    let state = {
+      score: 0,
+      perClick: 1,
+      autoPerSec: 0,
+      totalClicks: 0,
+      level: 1,
+      ownedSkins: ['stone'],
+      currentSkin: 'stone',
+      ownedUpgrades: {} // id: count
+    };
+
+    function loadGame() {
+      try {
+        const saved = localStorage.getItem('mc_clicker_pro');
+        if (saved) {
+          state = { ...state, ...JSON.parse(saved) };
+        }
+      } catch (e) {}
+      recalcStats();
+    }
+
+    function saveGame() {
+      localStorage.setItem('mc_clicker_pro', JSON.stringify(state));
+    }
+
+    function recalcStats() {
+      state.perClick = 1;
+      state.autoPerSec = 0;
+
+      for (const up of UPGRADES) {
+        const count = state.ownedUpgrades[up.id] || 0;
+        if (up.type === 'click') state.perClick += up.effect * count;
+        if (up.type === 'auto') state.autoPerSec += up.effect * count;
+      }
+      state.level = 1 + Math.floor(state.totalClicks / 100);
+    }
+
+    // ==========================================
+    // 4. ОТРИСОВКА ИНТЕРФЕЙСА
+    // ==========================================
+    const els = {
+      score: document.getElementById('score-val'),
+      level: document.getElementById('level-val'),
+      block: document.getElementById('main-block'),
+      clickZone: document.getElementById('click-zone'),
+      upgradesContainer: document.getElementById('upgrades'),
+      skinsContainer: document.getElementById('skins')
+    };
+
+    function formatNum(n) {
+      if (n >= 1e9) return (n/1e9).toFixed(2) + 'B';
+      if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+      return Math.floor(n).toString();
+    }
+
+    function getUpgradeCost(up) {
+      const count = state.ownedUpgrades[up.id] || 0;
+      return Math.floor(up.baseCost * Math.pow(1.6, count));
+    }
+
+    function render() {
+      els.score.textContent = formatNum(state.score);
+      els.level.textContent = state.level;
+      els.block.src = textureCache[state.currentSkin];
+
+      renderUpgrades();
+      renderSkins();
+    }
+
+    function renderUpgrades() {
+      els.upgradesContainer.innerHTML = '';
+      UPGRADES.forEach(up => {
+        const count = state.ownedUpgrades[up.id] || 0;
+        const cost = getUpgradeCost(up);
+        const canAfford = state.score >= cost;
+
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <div class="card-info">
+            <div class="card-title">${up.name} ${count > 0 ? `<span style="color:var(--text-muted)">x${count}</span>` : ''}</div>
+            <div class="card-desc">${up.desc}</div>
+          </div>
+          <button class="buy-btn ${canAfford ? 'available' : ''}" data-id="${up.id}">
+            ${formatNum(cost)}
+          </button>
+        `;
+        els.upgradesContainer.appendChild(div);
+      });
+    }
+
+    function renderSkins() {
+      els.skinsContainer.innerHTML = '';
+      SKINS.forEach(skin => {
+        const isOwned = state.ownedSkins.includes(skin.id);
+        const isSelected = state.currentSkin === skin.id;
+        const canAfford = state.score >= skin.price;
+
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <img class="card-icon" src="${textureCache[skin.id]}">
+          <div class="card-info">
+            <div class="card-title">${skin.name}</div>
+          </div>
+          <button class="buy-btn ${isSelected ? 'owned' : (isOwned ? '' : (canAfford ? 'available' : ''))}" data-skin="${skin.id}">
+            ${isSelected ? 'Выбран' : (isOwned ? 'Выбрать' : formatNum(skin.price))}
+          </button>
+        `;
+
+        // Клик по всему блоку выбора скина
+        div.onclick = () => handleSkinClick(skin);
+        els.skinsContainer.appendChild(div);
+      });
+    }
+
+    // ==========================================
+    // 5. ЛОГИКА
+    // ==========================================
+    function handleSkinClick(skin) {
+      if (state.currentSkin === skin.id) return;
+
+      if (state.ownedSkins.includes(skin.id)) {
+        state.currentSkin = skin.id;
+        saveGame(); render();
+      } else if (state.score >= skin.price) {
+        state.score -= skin.price;
+        state.ownedSkins.push(skin.id);
+        state.currentSkin = skin.id;
+        saveGame(); render();
+      }
+    }
+
+    els.upgradesContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.buy-btn');
+      if (!btn || !btn.dataset.id) return;
+
+      const up = UPGRADES.find(u => u.id === btn.dataset.id);
+      const cost = getUpgradeCost(up);
+
+      if (state.score >= cost) {
+        state.score -= cost;
+        state.ownedUpgrades[up.id] = (state.ownedUpgrades[up.id] || 0) + 1;
+        recalcStats(); saveGame(); render();
+      }
+    });
+
+    // Клик по блоку
+    els.block.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.score += state.perClick;
+      state.totalClicks++;
+      recalcStats();
+      saveGame();
+
+      // Обновляем только текст, чтобы не перерисовывать весь интерфейс (оптимизация)
+      els.score.textContent = formatNum(state.score);
+      els.level.textContent = state.level;
+
+      // Обновляем кнопки, если хватает денег
+      renderUpgrades();
+
+      // Эффект клика
+      const popup = document.createElement('div');
+      popup.className = 'floating-text';
+      popup.textContent = `+${formatNum(state.perClick)}`;
+
+      // Позиция клика относительно игровой зоны
+      const rect = els.clickZone.getBoundingClientRect();
+      popup.style.left = (e.clientX - rect.left) + 'px';
+      popup.style.top = (e.clientY - rect.top) + 'px';
+
+      els.clickZone.appendChild(popup);
+      setTimeout(() => popup.remove(), 600);
+    });
+
+    // Автодоход (тик каждую секунду)
+    setInterval(() => {
+      if (state.autoPerSec > 0) {
+        state.score += state.autoPerSec;
+        els.score.textContent = formatNum(state.score);
+        renderUpgrades(); // Обновляем доступность кнопок
+        saveGame();
+      }
+    }, 1000);
+
+    // Переключение табов
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.content-container').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.target).classList.add('active');
+      };
+    });
+
+    function resetGame() {
+      if (confirm('Сбросить весь прогресс?')) {
+        localStorage.removeItem('mc_clicker_pro');
+        location.reload();
+      }
+    }
+
+    // ==========================================
+    // 6. TELEGRAM ИНТЕГРАЦИЯ
+    // ==========================================
+    if (window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+      // Устанавливаем цвет хедера и фона в тон нашему дизайну
+      tg.setHeaderColor('#000000');
+      tg.setBackgroundColor('#000000');
+    }
+
+    // Запуск
+    loadGame();
+    render();
+
+</script>
+</body>
+</html>
